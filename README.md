@@ -2,6 +2,8 @@
 
 ソフトウェア・ハードウェア・アプリ・Webサイトに AI が使われているかを調べる Web サイト。
 
+公開中: https://ai-checker-henna.vercel.app
+
 ## 調べ方
 
 | モード | しくみ | 処理場所 |
@@ -40,3 +42,15 @@ vercel --prod   # 本番
 - Claude API による判定理由の要約（`ANTHROPIC_API_KEY` を設定した場合のみ）
 - アプリストアのページ（App Store / Google Play）の解析
 - スキャン結果のキャッシュと共有リンク
+
+## コントリビュート
+
+Issue・Pull Request を歓迎します。特に次のような貢献が助かります。
+
+- **製品データの追加・修正**（`src/data/products.ts`）— 公式の発表や製品ページを `sources` に入れてください
+- **検出ルールの追加**（`src/lib/signatures.ts`）— 新しい AI チャットボットや ML ライブラリなど
+- 誤検出・見逃しの報告 — 対象の URL と期待する結果を Issue に書いてください
+
+## ライセンス
+
+[MIT](LICENSE)
