@@ -2,7 +2,7 @@
 
 ソフトウェア・ハードウェア・アプリ・Webサイトに AI が使われているかを調べる Web サイト。
 
-公開中: https://ai-checker-henna.vercel.app
+公開中: https://ai-checker-hotakacchi.vercel.app
 
 ## 調べ方
 
