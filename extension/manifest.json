@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "AIチェッカー",
+  "version": "0.1.0",
+  "description": "開いているWebサイトにAIが使われているかを調べます。",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "このサイト、AI使ってる？",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["activeTab"],
+  "host_permissions": ["https://ai-checker-hotakacchi.vercel.app/*"]
+}

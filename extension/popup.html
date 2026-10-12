@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>AIチェッカー</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span class="brand">AIチェッカー</span>
+      <span id="host" class="host"></span>
+    </header>
+
+    <section id="start">
+      <p class="muted">このページの URL を AIチェッカーのサーバーに送って調べます。閲覧履歴は送りません。</p>
+      <button id="check" class="primary">このサイトを調べる</button>
+    </section>
+
+    <section id="loading" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="muted">スクリプトとポリシーを調べています…</p>
+    </section>
+
+    <section id="error" hidden>
+      <p id="error-message" class="error"></p>
+    </section>
+
+    <section id="result" hidden>
+      <div id="verdict" class="verdict">
+        <div>
+          <p id="verdict-title" class="verdict-title"></p>
+          <p id="platform" class="small" hidden></p>
+        </div>
+        <p class="score"><span id="score"></span><span class="small">/100</span></p>
+      </div>
+
+      <div class="training">
+        <span class="label">データの学習利用</span>
+        <span id="training"></span>
+      </div>
+
+      <ul id="findings" class="findings"></ul>
+    </section>
+
+    <footer>
+      <a id="details" href="#" hidden>詳しい結果を見る →</a>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
