@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { analyzeText } from "@/lib/analyzeText";
 import type { AnalysisResult, ScanResult } from "@/lib/types";
 import { searchProducts } from "@/data/products";
+import { addProductUrl } from "@/lib/report";
 import { ProductCard } from "./ProductCard";
 import { ResultView } from "./ResultView";
 
 type Mode = "url" | "product" | "text";
+
+type ScanResultResponse = ScanResult & { shareId: string | null; scannedAt: string; cached: boolean };
 
 const TABS: { mode: Mode; label: string; hint: string }[] = [
   { mode: "url", label: "Webサイト", hint: "URLを入力すると、埋め込まれた技術とポリシーを調べます" },
@@ -53,10 +56,9 @@ function UrlChecker({ onPaste }: { onPaste: () => void }) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; canPaste: boolean } | null>(null);
-  const [result, setResult] = useState<ScanResult | null>(null);
+  const [result, setResult] = useState<ScanResultResponse | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function scan(url: string) {
     if (!url.trim()) return;
     setLoading(true);
     setError(null);
@@ -78,6 +80,22 @@ function UrlChecker({ onPaste }: { onPaste: () => void }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  // /?url=example.com で開かれたら（ブラウザ拡張・共有ページの「もう一度調べる」から）すぐに調べる
+  useEffect(() => {
+    const initial = new URLSearchParams(location.search).get("url");
+    if (initial) {
+      // URL パラメータは描画後にしか読めないので、ここで状態を入れるのは意図どおり
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setUrl(initial);
+      void scan(initial);
+    }
+  }, []);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    void scan(url);
   }
 
   return (
@@ -111,7 +129,7 @@ function UrlChecker({ onPaste }: { onPaste: () => void }) {
           )}
         </div>
       )}
-      {result && <ResultView result={result} />}
+      {result && <ResultView result={result} shareId={result.shareId} />}
     </>
   );
 }
@@ -144,6 +162,15 @@ function ProductSearch({ onScanUrl }: { onScanUrl: () => void }) {
               URLで調べる
             </button>
             か、利用規約の文章を貼り付けて調べられます。
+            <br />
+            <a
+              href={addProductUrl(query.trim())}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-block font-medium text-accent underline underline-offset-2"
+            >
+              この製品の追加をリクエストする
+            </a>
           </div>
         )}
       </div>

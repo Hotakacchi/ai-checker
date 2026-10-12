@@ -1,5 +1,6 @@
-import { FetchBlockedError } from "@/lib/safeFetch";
+import { FetchBlockedError, normalizeUrl } from "@/lib/safeFetch";
 import { scanUrl } from "@/lib/scanUrl";
+import { getCachedScan, saveScan, type StoredScan } from "@/lib/store";
 
 export const maxDuration = 30;
 
@@ -17,12 +18,11 @@ function rateLimited(ip: string): boolean {
   return recent.length > LIMIT;
 }
 
-export async function POST(request: Request) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
-  if (rateLimited(ip)) {
-    return Response.json({ error: "リクエストが多すぎます。1分ほど待ってから再度お試しください" }, { status: 429 });
-  }
+/** 画面に返す形。共有リンクが使えないとき（Redis 未設定）は shareId が null */
+const respond = (stored: StoredScan | null, result: StoredScan["result"], cached: boolean) =>
+  Response.json({ ...result, shareId: stored?.id ?? null, scannedAt: stored?.scannedAt ?? new Date().toISOString(), cached });
 
+export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { url?: unknown } | null;
   const url = typeof body?.url === "string" ? body.url : "";
   if (!url || url.length > 2048) {
@@ -30,7 +30,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    return Response.json(await scanUrl(url));
+    // 1時間以内に同じ URL を調べた結果があれば、それを返す（レート制限にも数えない）
+    const normalized = normalizeUrl(url).href;
+    const cached = await getCachedScan(normalized);
+    if (cached) return respond(cached, cached.result, true);
+
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+    if (rateLimited(ip)) {
+      return Response.json({ error: "リクエストが多すぎます。1分ほど待ってから再度お試しください" }, { status: 429 });
+    }
+
+    const result = await scanUrl(normalized);
+    return respond(await saveScan(normalized, result), result, false);
   } catch (err) {
     // undici は接続時のエラーを "fetch failed" の cause に包んで投げる
     const blocked = err instanceof FetchBlockedError ? err : err instanceof Error && err.cause instanceof FetchBlockedError ? err.cause : null;

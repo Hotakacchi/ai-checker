@@ -13,12 +13,24 @@ export type Finding = {
 
 export type Verdict = "likely" | "possible" | "faint" | "none";
 
+/**
+ * 入力・投稿したデータがAIの学習に使われるか。「AIを使っているか」とは別に判定する。
+ * used: 使うと書かれている / not-used: 使わないと明記 / unknown: 記述なし
+ */
+export type TrainingUse = {
+  status: "used" | "not-used" | "unknown";
+  /** 学習への利用を止める方法（オプトアウト）が書かれているか */
+  optOut: boolean;
+  evidence: Finding[];
+};
+
 export type AnalysisResult = {
   verdict: Verdict;
   score: number;
   findings: Finding[];
   /** 否定文の中で見つかった語（例:「AIは使用していません」） */
   negated: Finding[];
+  training: TrainingUse;
 };
 
 export type ScanResult = AnalysisResult & {

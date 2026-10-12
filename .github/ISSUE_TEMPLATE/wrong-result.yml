@@ -1,0 +1,38 @@
+name: 誤判定の報告
+description: AIチェッカーの判定結果が実際と違う
+labels: ["誤判定"]
+body:
+  - type: input
+    id: target
+    attributes:
+      label: 調べた URL（または製品名）
+      description: 文章を貼り付けて調べた場合は、どんな文章か（例：〇〇社のプライバシーポリシー）を書いてください。個人情報は書かないでください。
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: 調べ方
+      options:
+        - Webサイト（URL）
+        - 文章を貼り付け
+        - 製品・アプリ名
+  - type: input
+    id: actual
+    attributes:
+      label: 表示された判定
+  - type: dropdown
+    id: expected
+    attributes:
+      label: 正しいと思う判定
+      options:
+        - AIを使っている
+        - AIを使っていない
+        - わからない
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: 理由・根拠
+      description: そう判断した理由や、公式の発表などの出典があれば書いてください。

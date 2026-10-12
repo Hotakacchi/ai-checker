@@ -1,5 +1,5 @@
 import { NEGATION_PATTERN, STRENGTH_WEIGHT, TEXT_KEYWORDS } from "./signatures";
-import type { AnalysisResult, Finding, Verdict } from "./types";
+import type { AnalysisResult, Finding, TrainingUse, Verdict } from "./types";
 
 const SNIPPET_RADIUS = 40;
 const MAX_SNIPPETS = 3;
@@ -49,7 +49,21 @@ export function findTextSignals(text: string, source: string): { findings: Findi
  * 発見事項からスコアと判定を出す。
  * 同じ種類のシグナルが複数の場所で見つかっても、加点は最初の1回だけ（重み付けの水増しを防ぐ）。
  */
-export function summarize(findings: Finding[], negated: Finding[]): AnalysisResult {
+export function summarize(allFindings: Finding[], allNegated: Finding[]): AnalysisResult {
+  // 学習利用の記述は「AIを使っているか」のスコアから切り離して、別に判定する
+  const isTraining = (f: Finding) => /:(?:training|optout)$/.test(f.id);
+  const findings = allFindings.filter((f) => !isTraining(f));
+  const negated = allNegated.filter((f) => !isTraining(f));
+  const trainingYes = allFindings.filter((f) => f.id.endsWith(":training"));
+  const trainingNo = allNegated.filter((f) => f.id.endsWith(":training"));
+  // オプトアウトの文は「使わないようにできる」と否定形になりやすいので、否定文の中のものも数える
+  const optOut = [...allFindings, ...allNegated].filter((f) => f.id.endsWith(":optout"));
+  const training: TrainingUse = {
+    status: trainingYes.length ? "used" : trainingNo.length ? "not-used" : "unknown",
+    optOut: optOut.length > 0,
+    evidence: [...trainingYes, ...trainingNo.map((f) => ({ ...f, label: "AIの学習に使わないとの記述" })), ...optOut],
+  };
+
   const counted = new Set<string>();
   let score = 0;
   for (const f of findings) {
@@ -70,7 +84,7 @@ export function summarize(findings: Finding[], negated: Finding[]): AnalysisResu
 
   const order = { strong: 0, medium: 1, weak: 2, info: 3 };
   findings.sort((a, b) => order[a.strength] - order[b.strength]);
-  return { verdict, score, findings, negated };
+  return { verdict, score, findings, negated, training };
 }
 
 export function analyzeText(text: string, source = "入力テキスト"): AnalysisResult {

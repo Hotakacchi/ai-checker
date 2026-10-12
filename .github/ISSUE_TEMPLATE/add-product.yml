@@ -1,0 +1,37 @@
+name: 製品の追加・修正
+description: 製品データベースに製品を追加する、または情報を修正する
+labels: ["製品データ"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: 製品名
+    validations:
+      required: true
+  - type: input
+    id: maker
+    attributes:
+      label: メーカー・開発元
+  - type: dropdown
+    id: category
+    attributes:
+      label: 種類
+      options:
+        - ソフトウェア
+        - ハードウェア
+        - アプリ
+        - Webサービス
+  - type: textarea
+    id: ai
+    attributes:
+      label: AIの使われ方
+      description: どんな機能にAIが使われているか。入力データが学習に使われるかもわかれば書いてください。
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: 出典
+      description: 公式の発表・製品ページ・ヘルプページなどの URL
+    validations:
+      required: true

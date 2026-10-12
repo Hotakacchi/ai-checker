@@ -1,23 +1,26 @@
-import type { AnalysisResult, Finding, ScanResult, Strength, Verdict } from "@/lib/types";
+import { wrongResultUrl } from "@/lib/report";
+import { VERDICT_TITLE } from "@/lib/verdicts";
+import type { AnalysisResult, Finding, ScanResult, Strength, TrainingUse, Verdict } from "@/lib/types";
+import { ShareButton } from "./ShareButton";
 
 const VERDICTS: Record<Verdict, { title: string; body: string; tone: string }> = {
   likely: {
-    title: "AIが使われている可能性が高い",
+    title: VERDICT_TITLE.likely,
     body: "AIサービスやAI関連の明確な記述が見つかりました。",
     tone: "border-violet-300 bg-violet-50 text-violet-950 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-100",
   },
   possible: {
-    title: "AIが使われている可能性あり",
+    title: VERDICT_TITLE.possible,
     body: "AI機能を持つサービスや、AIに関係する記述が見つかりました。実際に使われているかは確認が必要です。",
     tone: "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100",
   },
   faint: {
-    title: "わずかな兆候あり",
+    title: VERDICT_TITLE.faint,
     body: "AIと関係するかもしれない語が見つかりましたが、決め手にはなりません。",
     tone: "border-sky-300 bg-sky-50 text-sky-950 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100",
   },
   none: {
-    title: "AIの兆候は見つかりませんでした",
+    title: VERDICT_TITLE.none,
     body: "外から見える範囲には見つかりませんでした。サーバー側でAIを使っている可能性は残ります。",
     tone: "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100",
   },
@@ -30,7 +33,7 @@ const STRENGTH_LABEL: Record<Strength, { text: string; className: string }> = {
   info: { text: "参考", className: "bg-line text-muted" },
 };
 
-export function ResultView({ result }: { result: AnalysisResult | ScanResult }) {
+export function ResultView({ result, shareId }: { result: AnalysisResult | ScanResult; shareId?: string | null }) {
   const v = VERDICTS[result.verdict];
   const scan = "url" in result ? result : null;
 
@@ -54,6 +57,8 @@ export function ResultView({ result }: { result: AnalysisResult | ScanResult }) 
           </div>
         </div>
       </div>
+
+      <TrainingCard training={result.training} />
 
       {scan?.platform && (
         <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm leading-relaxed text-muted">
@@ -108,7 +113,54 @@ export function ResultView({ result }: { result: AnalysisResult | ScanResult }) 
           </ul>
         </details>
       )}
+      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5 text-sm">
+        {shareId && <ShareButton id={shareId} />}
+        <a
+          href={wrongResultUrl({
+            target: scan ? scan.url : "（貼り付けた文章）",
+            verdict: result.verdict,
+            score: result.score,
+            mode: scan ? "url" : "text",
+          })}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-muted underline underline-offset-2 hover:text-foreground"
+        >
+          判定が違う？ 報告する
+        </a>
+      </div>
     </div>
+  );
+}
+
+const TRAINING: Record<TrainingUse["status"], { title: string; body: string; dot: string }> = {
+  used: { title: "AIの学習に使われる可能性あり", body: "入力・投稿したデータを AI モデルの学習や改善に使うという記述があります。", dot: "bg-rose-500" },
+  "not-used": { title: "AIの学習には使わないと明記", body: "データを AI の学習に使わないという記述があります。", dot: "bg-emerald-500" },
+  unknown: { title: "記述は見つかりませんでした", body: "データを AI の学習に使うかどうかの記述は見つかりませんでした。", dot: "bg-line" },
+};
+
+function TrainingCard({ training }: { training: TrainingUse }) {
+  const t = TRAINING[training.status];
+  return (
+    <section className="rounded-2xl border border-line bg-surface px-5 py-4">
+      <p className="text-xs font-medium text-muted">データの学習利用</p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <span className={`h-2.5 w-2.5 rounded-full ${t.dot}`} aria-hidden />
+        <h3 className="font-bold">{t.title}</h3>
+        {training.optOut && <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-xs font-medium text-white">オプトアウトの記述あり</span>}
+      </div>
+      <p className="mt-1 text-sm text-muted">{t.body}</p>
+      {training.evidence.length > 0 && (
+        <details className="mt-3 text-sm">
+          <summary className="cursor-pointer text-muted">根拠を見る（{training.evidence.length}件）</summary>
+          <ul className="mt-2 space-y-3">
+            {training.evidence.map((f) => (
+              <FindingItem key={f.id + f.label} finding={f} muted />
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
   );
 }
 

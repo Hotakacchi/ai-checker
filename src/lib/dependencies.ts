@@ -53,6 +53,24 @@ const DEP_FILES: DepFile[] = [
   },
 ];
 
+/** 依存関係ファイルの中身から AI / ML ライブラリを探す */
+export function detectAiPackages(path: string, body: string): { label: string; name: string }[] {
+  const file = DEP_FILES.find((f) => f.path === path);
+  if (!file) return [];
+  let names: string[];
+  try {
+    names = file.parse(body);
+  } catch {
+    return [];
+  }
+  const out: { label: string; name: string }[] = [];
+  for (const name of new Set(names)) {
+    const pkg = AI_PACKAGES.find((p) => p.pattern.test(name));
+    if (pkg) out.push({ label: pkg.label, name });
+  }
+  return out;
+}
+
 export type DependencyCheck = { findings: Finding[]; filesFound: string[]; checked: { url: string; ok: boolean }[] };
 
 /** github.com/{owner}/{repo} 形式の URL からリポジトリを特定する */
@@ -77,21 +95,13 @@ export async function checkGitHubDependencies(owner: string, repo: string): Prom
     if (!ok) return;
     checked.push({ url: base + file.path, ok });
     filesFound.push(file.path);
-    let names: string[];
-    try {
-      names = file.parse(r.value.body);
-    } catch {
-      return;
-    }
-    for (const name of new Set(names)) {
-      const pkg = AI_PACKAGES.find((p) => p.pattern.test(name));
-      if (!pkg) continue;
-      const existing = hits.get(pkg.label);
+    for (const { label, name } of detectAiPackages(file.path, r.value.body)) {
+      const existing = hits.get(label);
       const evidence = `${file.path}: ${name}`;
       if (existing) {
         if (existing.evidence.length < 5) existing.evidence.push(evidence);
       } else {
-        hits.set(pkg.label, { id: `dep:${pkg.label}`, label: pkg.label, source: "依存関係", strength: "strong", evidence: [evidence] });
+        hits.set(label, { id: `dep:${label}`, label, source: "依存関係", strength: "strong", evidence: [evidence] });
       }
     }
   });
