@@ -24,5 +24,7 @@ export type AnalysisResult = {
 export type ScanResult = AnalysisResult & {
   url: string;
   title: string | null;
+  /** GitHub や App Store など、他者のコンテンツを載せているプラットフォーム上のページ */
+  platform: { name: string; isRepository: boolean } | null;
   pagesChecked: { url: string; kind: string; ok: boolean }[];
 };

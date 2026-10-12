@@ -55,6 +55,15 @@ export function ResultView({ result }: { result: AnalysisResult | ScanResult }) 
         </div>
       </div>
 
+      {scan?.platform && (
+        <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm leading-relaxed text-muted">
+          <b className="text-foreground">{scan.platform.name}</b> 上のページです。{scan.platform.name}
+          自体のスクリプトや規約ではなく、ページに載っている内容
+          {scan.platform.isRepository && "（README と依存関係ファイル）"}
+          だけを調べました。
+        </p>
+      )}
+
       {result.findings.length > 0 && (
         <section>
           <h3 className="mb-3 font-semibold">見つかった根拠（{result.findings.length}件）</h3>

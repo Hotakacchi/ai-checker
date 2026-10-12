@@ -63,7 +63,8 @@ export function summarize(findings: Finding[], negated: Finding[]): AnalysisResu
   const hasStrong = findings.some((f) => f.strength === "strong");
   let verdict: Verdict;
   if (hasStrong && score >= 30) verdict = "likely";
-  else if (score >= 12) verdict = "possible";
+  // 弱い根拠をいくら積み重ねても「可能性あり」にはしない
+  else if (score >= 12 && findings.some((f) => f.strength === "medium" || f.strength === "strong")) verdict = "possible";
   else if (score > 0) verdict = "faint";
   else verdict = "none";
 

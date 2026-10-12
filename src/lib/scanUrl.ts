@@ -1,9 +1,12 @@
 import "server-only";
 import * as cheerio from "cheerio";
+import type { AnyNode } from "domhandler";
 import { findTextSignals, summarize } from "./analyzeText";
+import { checkGitHubDependencies, parseGitHubRepo } from "./dependencies";
+import { findPlatform } from "./platforms";
 import { safeFetch } from "./safeFetch";
 import { TECH_SIGNATURES } from "./signatures";
-import type { Finding, ScanResult } from "./types";
+import type { Finding, ScanResult, Strength } from "./types";
 
 const MAX_BUNDLES = 6;
 const MAX_POLICY_PAGES = 3;
@@ -41,18 +44,20 @@ function excerpt(text: string, index: number, length: number): string {
   return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
 }
 
-function visibleText($: cheerio.CheerioAPI): string {
+function visibleText($: cheerio.CheerioAPI, scope?: cheerio.Cheerio<AnyNode>): string {
   $("script, style, noscript, template, svg").remove();
   // .text() は要素同士をそのまま連結するので、ブロック要素の後ろに改行を入れて文の区切りを残す
   $("br, p, div, li, dt, dd, h1, h2, h3, h4, h5, h6, td, th, tr, section, article, header, footer, nav, aside, button, a").append("\n");
   const meta = [$('meta[name="description"]').attr("content"), $('meta[property="og:description"]').attr("content")].filter(Boolean).join("\n");
-  return `${$("title").text()}\n${meta}\n${$("body").text()}`.replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n");
+  return `${$("title").text()}\n${meta}\n${(scope ?? $("body")).text()}`.replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n");
 }
+
+const DEMOTE: Record<Strength, Strength> = { strong: "medium", medium: "weak", weak: "weak", info: "info" };
 
 export async function scanUrl(input: string): Promise<ScanResult> {
   const page = await safeFetch(input);
   const base = new URL(page.url);
-  const pagesChecked: ScanResult["pagesChecked"] = [{ url: page.url, kind: "トップページ", ok: page.status < 400 }];
+  const pagesChecked: ScanResult["pagesChecked"] = [{ url: page.url, kind: "ページ", ok: page.status < 400 }];
   if (page.status >= 400) throw new Error(`ページを取得できませんでした (HTTP ${page.status})`);
 
   const $ = cheerio.load(page.body);
@@ -66,51 +71,96 @@ export async function scanUrl(input: string): Promise<ScanResult> {
     }
   };
 
-  // --- 1. 埋め込まれた技術を調べる ---
-  const haystacks: Haystack[] = [];
-  const bundleUrls: URL[] = [];
-  $("script[src]").each((_, el) => {
-    const u = resolve($(el).attr("src"));
-    if (!u) return;
-    haystacks.push({ source: "読み込みスクリプト", value: u.href });
-    if (u.host === base.host && bundleUrls.length < MAX_BUNDLES) bundleUrls.push(u);
-  });
-  $('link[rel="preload"], link[rel="modulepreload"], link[rel="preconnect"], link[rel="dns-prefetch"]').each((_, el) => {
-    const u = resolve($(el).attr("href"));
-    if (u) haystacks.push({ source: "事前読み込み", value: u.href });
-  });
-  $("iframe[src]").each((_, el) => {
-    const u = resolve($(el).attr("src"));
-    if (u) haystacks.push({ source: "埋め込みフレーム", value: u.href });
-  });
-  $("script:not([src])").each((_, el) => {
-    const code = $(el).html();
-    if (code && code.length > 20) haystacks.push({ source: "インラインスクリプト", value: code.slice(0, 200_000) });
-  });
-  // <df-messenger> のようなカスタム要素も対象にする
-  haystacks.push({ source: "HTML要素", value: page.body.match(/<[a-z]+-[a-z-]+[\s>]/gi)?.join(" ") ?? "" });
+  // GitHub や App Store などのプラットフォームでは、スクリプトや規約はプラットフォーム自身のもの。
+  // ページの中身だけを調べる
+  const platform = findPlatform(base.hostname);
+  let scope: cheerio.Cheerio<AnyNode> = $("body");
+  if (platform) {
+    for (const sel of platform.contentSelector) {
+      const el = $(sel).first();
+      if (el.length) {
+        scope = el;
+        break;
+      }
+    }
+  }
 
-  // 同一オリジンのJSバンドル（ライブラリが同梱されていることがある）
-  const bundles = await Promise.allSettled(bundleUrls.map((u) => safeFetch(u)));
-  bundles.forEach((r, i) => {
-    pagesChecked.push({ url: bundleUrls[i].href, kind: "JavaScript", ok: r.status === "fulfilled" && r.value.status < 400 });
-    if (r.status === "fulfilled" && r.value.status < 400) haystacks.push({ source: "JavaScriptバンドル", value: r.value.body });
-  });
-
-  const findings: Finding[] = matchTech(haystacks);
+  const findings: Finding[] = [];
   const negated: Finding[] = [];
+
+  // --- 1. 埋め込まれた技術を調べる ---
+  if (!platform) {
+    const haystacks: Haystack[] = [];
+    const bundleUrls: URL[] = [];
+    $("script[src]").each((_, el) => {
+      const u = resolve($(el).attr("src"));
+      if (!u) return;
+      haystacks.push({ source: "読み込みスクリプト", value: u.href });
+      if (u.host === base.host && bundleUrls.length < MAX_BUNDLES) bundleUrls.push(u);
+    });
+    $('link[rel="preload"], link[rel="modulepreload"], link[rel="preconnect"], link[rel="dns-prefetch"]').each((_, el) => {
+      const u = resolve($(el).attr("href"));
+      if (u) haystacks.push({ source: "事前読み込み", value: u.href });
+    });
+    $("iframe[src]").each((_, el) => {
+      const u = resolve($(el).attr("src"));
+      if (u) haystacks.push({ source: "埋め込みフレーム", value: u.href });
+    });
+    $("script:not([src])").each((_, el) => {
+      const code = $(el).html();
+      if (code && code.length > 20) haystacks.push({ source: "インラインスクリプト", value: code.slice(0, 200_000) });
+    });
+    // <df-messenger> のようなカスタム要素も対象にする
+    haystacks.push({ source: "HTML要素", value: page.body.match(/<[a-z]+-[a-z-]+[\s>]/gi)?.join(" ") ?? "" });
+
+    // 同一オリジンのJSバンドル（ライブラリが同梱されていることがある）
+    const bundles = await Promise.allSettled(bundleUrls.map((u) => safeFetch(u)));
+    bundles.forEach((r, i) => {
+      pagesChecked.push({ url: bundleUrls[i].href, kind: "JavaScript", ok: r.status === "fulfilled" && r.value.status < 400 });
+      if (r.status === "fulfilled" && r.value.status < 400) haystacks.push({ source: "JavaScriptバンドル", value: r.value.body });
+    });
+    findings.push(...matchTech(haystacks));
+  }
 
   // --- 2. ページ本文の記述を調べる ---
   const policyLinks: { kind: string; url: URL }[] = [];
-  $("a[href]").each((_, el) => {
+  scope.find("a[href]").each((_, el) => {
     const href = $(el).attr("href") ?? "";
     const text = `${$(el).text()} ${href}`;
     const u = resolve(href);
     if (!u || !/^https?:$/.test(u.protocol) || u.href === page.url) return;
+    // プラットフォーム内へのリンクはプラットフォーム自身の規約なので除外
+    if (platform && platform.host.test(u.hostname)) return;
     const hit = POLICY_LINKS.find((p) => p.pattern.test(text));
     if (hit && !policyLinks.some((p) => p.kind === hit.kind || p.url.href === u.href)) policyLinks.push({ kind: hit.kind, url: u });
   });
-  const mainText = findTextSignals(visibleText($), "ページ本文");
+  const contentLabel = platform ? `${platform.name}上の説明` : "ページ本文";
+  const mainText = findTextSignals(visibleText($, scope), contentLabel);
+
+  // GitHub リポジトリなら依存関係を調べる。README は「AIについて書いている」だけの場合があるので、
+  // 依存関係が読めたときは README の記述を一段階（AIライブラリがなければ二段階）弱める
+  const repo = platform?.id === "github" ? parseGitHubRepo(base) : null;
+  if (repo) {
+    const deps = await checkGitHubDependencies(repo.owner, repo.repo);
+    deps.checked.forEach((c) => pagesChecked.push({ url: c.url, kind: "依存関係", ok: c.ok }));
+    findings.push(...deps.findings);
+    if (deps.filesFound.length > 0) {
+      const steps = deps.findings.length > 0 ? 1 : 2;
+      for (const f of mainText.findings) {
+        for (let i = 0; i < steps; i++) f.strength = DEMOTE[f.strength];
+      }
+      if (deps.findings.length === 0) {
+        findings.push({
+          id: "info:no-ai-deps",
+          label: "依存関係に AI ライブラリは見つかりませんでした",
+          source: "依存関係",
+          strength: "info",
+          evidence: deps.filesFound,
+          note: "README の記述は、AI を使っているのではなく AI について書いているだけの可能性があるため、弱い根拠として扱っています",
+        });
+      }
+    }
+  }
   findings.push(...mainText.findings);
   negated.push(...mainText.negated);
 
@@ -119,7 +169,7 @@ export async function scanUrl(input: string): Promise<ScanResult> {
   const llmsTxtUrl = new URL("/llms.txt", base);
   const [policies, llmsTxt] = await Promise.all([
     Promise.allSettled(selected.map((p) => safeFetch(p.url))),
-    safeFetch(llmsTxtUrl).catch(() => null),
+    platform ? null : safeFetch(llmsTxtUrl).catch(() => null),
   ]);
   policies.forEach((r, i) => {
     const { kind, url } = selected[i];
@@ -143,5 +193,11 @@ export async function scanUrl(input: string): Promise<ScanResult> {
     });
   }
 
-  return { url: page.url, title, pagesChecked, ...summarize(findings, negated) };
+  return {
+    url: page.url,
+    title,
+    platform: platform ? { name: platform.name, isRepository: Boolean(repo) } : null,
+    pagesChecked,
+    ...summarize(findings, negated),
+  };
 }
