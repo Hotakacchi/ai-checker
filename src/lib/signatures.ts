@@ -59,6 +59,9 @@ export type TextKeyword = {
 const w = (s: string) => new RegExp(`(?<![A-Za-z0-9])(?:${s})(?![A-Za-z0-9])`, "gi");
 
 export const TEXT_KEYWORDS: TextKeyword[] = [
+  // AIで作ったことの開示（記事・画像などで重要）
+  { id: "disclosure", label: "AIで作成したことの開示", strength: "strong", pattern: /(?:記事|文章|本文|画像|イラスト|写真|コンテンツ|動画|音声|BGM|原稿|下書き|翻訳)[^。\n]{0,25}(?:AI|ＡＩ|ChatGPT|Claude|Gemini|Copilot)[^。\n]{0,12}(?:で|を使って|を使用して|を利用して|を活用して|により|によって|の力を借りて)[^。\n]{0,6}(?:生成|作成|執筆|書|作|翻訳|校正|構成)|(?:AI|ＡＩ)(?:が|で)(?:書いた|生成した|作成した)|(?:this|the) (?:post|article|content|image|text|story|piece)[^.\n]{0,40}(?:was|were|is|has been)? ?(?:generated|written|created|drafted|translated|edited)[^.\n]{0,15}(?:with|by|using) (?:the help of |assistance from )?(?:AI|ChatGPT|Claude|Gemini|Copilot)|AI-(?:generated|written|assisted) (?:content|image|article|post|text)/gi, note: "コンテンツをAIで作ったことを明かす記述" },
+
   // データ学習への利用（プライバシーポリシーで重要）
   { id: "training", label: "データをAIの学習に利用", strength: "strong", pattern: /(?:AI|モデル|人工知能)の(?:学習|訓練|トレーニング)|学習(?:データ)?に(?:利用|使用)|train(?:ing)? (?:our |of )?(?:AI |ML )?models?|model training|improve our models/gi, note: "入力したデータがAIの学習に使われる可能性" },
 
@@ -89,7 +92,7 @@ export const TEXT_KEYWORDS: TextKeyword[] = [
 
 /** 同じ文の中にこれがあれば「AIを使っていない」という否定文とみなす */
 export const NEGATION_PATTERN =
-  /(?:使用|利用|搭載|活用)(?:して|しており)?(?:い)?ません|使っていません|使わない|使用しない|利用しない|不使用|AIフリー|(?<![A-Za-z])(?:do(?:es)? not|don't|doesn't|never|no longer) (?:use|rely|train|employ)|not (?:use|train)(?:d)? |AI-free|without (?:any )?AI|no AI/i;
+  /(?:使用|利用|搭載|活用)(?:して|しており)?(?:い)?ません|使っていません|使わない|使わず|使用しない|利用しない|使用せず|利用せず|頼らず|不使用|AIフリー|(?<![A-Za-z])(?:do(?:es)? not|don't|doesn't|never|no longer) (?:use|rely|train|employ)|not (?:use|train)(?:d)? |AI-free|without (?:any )?AI|no AI/i;
 
 export const STRENGTH_WEIGHT: Record<Strength, number> = {
   strong: 30,

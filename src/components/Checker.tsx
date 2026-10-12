@@ -37,7 +37,7 @@ export function Checker() {
       </div>
       <p className="mb-4 text-sm text-muted">{TABS.find((t) => t.mode === mode)!.hint}</p>
 
-      {mode === "url" && <UrlChecker />}
+      {mode === "url" && <UrlChecker onPaste={() => setMode("text")} />}
       {mode === "product" && <ProductSearch onScanUrl={() => setMode("url")} />}
       {mode === "text" && <TextChecker />}
     </div>
@@ -49,10 +49,10 @@ const inputClass =
 const buttonClass =
   "shrink-0 rounded-xl bg-accent px-5 py-3 font-medium text-white transition hover:opacity-90 disabled:opacity-50";
 
-function UrlChecker() {
+function UrlChecker({ onPaste }: { onPaste: () => void }) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; canPaste: boolean } | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
 
   async function submit(e: React.FormEvent) {
@@ -68,10 +68,13 @@ function UrlChecker() {
         body: JSON.stringify({ url }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "エラーが発生しました");
+      if (!res.ok) {
+        setError({ message: data.error ?? "エラーが発生しました", canPaste: Boolean(data.canPaste) });
+        return;
+      }
       setResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "エラーが発生しました");
+    } catch {
+      setError({ message: "通信エラーが発生しました", canPaste: false });
     } finally {
       setLoading(false);
     }
@@ -94,7 +97,20 @@ function UrlChecker() {
         </button>
       </form>
       {loading && <p className="mt-6 text-sm text-muted">ページ・スクリプト・ポリシーを取得しています。10秒ほどかかることがあります。</p>}
-      {error && <p className="mt-6 rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">{error}</p>}
+      {error && (
+        <div className="mt-6 rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">
+          <p>{error.message}</p>
+          {error.canPaste && (
+            <p className="mt-2">
+              ボット対策などで取得できないサイトがあります。ページの本文をコピーして
+              <button onClick={onPaste} className="mx-1 font-medium underline underline-offset-2">
+                「文章を貼り付け」で調べる
+              </button>
+              こともできます。
+            </p>
+          )}
+        </div>
+      )}
       {result && <ResultView result={result} />}
     </>
   );

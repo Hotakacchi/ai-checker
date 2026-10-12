@@ -64,6 +64,13 @@ export function ResultView({ result }: { result: AnalysisResult | ScanResult }) 
         </p>
       )}
 
+      {scan?.isArticle && (
+        <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm leading-relaxed text-muted">
+          <b className="text-foreground">記事ページ</b>
+          として判定しました。記事に AI の話題が出てくるだけでは弱い根拠とし、「AIで作成した」など AI を使って作ったことを明かす記述を重視しています。
+        </p>
+      )}
+
       {result.findings.length > 0 && (
         <section>
           <h3 className="mb-3 font-semibold">見つかった根拠（{result.findings.length}件）</h3>

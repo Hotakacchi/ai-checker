@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "URLの形式が正しくありません" }, { status: 400 });
     }
     const message = err instanceof Error && err.name === "TimeoutError" ? "ページの応答がタイムアウトしました" : err instanceof Error ? err.message : "不明なエラー";
-    return Response.json({ error: `取得に失敗しました: ${message}` }, { status: 502 });
+    // ボット対策などで取得できないサイトもあるので、本文を貼り付けて調べる方法を案内する
+    return Response.json({ error: `取得に失敗しました: ${message}`, canPaste: true }, { status: 502 });
   }
 }

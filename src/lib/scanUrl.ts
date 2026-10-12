@@ -75,15 +75,23 @@ export async function scanUrl(input: string): Promise<ScanResult> {
   // ページの中身だけを調べる
   const platform = findPlatform(base.hostname);
   let scope: cheerio.Cheerio<AnyNode> = $("body");
+  let scopeFound = false;
   if (platform) {
     for (const sel of platform.contentSelector) {
       const el = $(sel).first();
       if (el.length) {
         scope = el;
+        scopeFound = true;
         break;
       }
     }
+    // 本文の要素が見つからない（一覧ページなど）ときは、ヘッダー・フッターなどプラットフォームの枠を除いて調べる
+    if (!scopeFound) $("header, footer, nav, aside, [role=banner], [role=contentinfo], [role=navigation]").remove();
   }
+
+  // 記事ページでは「AIについて書いている」だけのことが多いので、本文の扱いを変える
+  const ogType = $('meta[property="og:type"]').attr("content")?.toLowerCase();
+  const isArticle = platform?.kind === "blog" || ogType === "article";
 
   const findings: Finding[] = [];
   const negated: Finding[] = [];
@@ -129,13 +137,21 @@ export async function scanUrl(input: string): Promise<ScanResult> {
     const text = `${$(el).text()} ${href}`;
     const u = resolve(href);
     if (!u || !/^https?:$/.test(u.protocol) || u.href === page.url) return;
+    // プラットフォームでは、本文の中にあるリンク（例: アプリ開発者のプライバシーポリシー）だけをたどる。
     // プラットフォーム内へのリンクはプラットフォーム自身の規約なので除外
-    if (platform && platform.host.test(u.hostname)) return;
+    if (platform && (!scopeFound || platform.host.test(u.hostname))) return;
     const hit = POLICY_LINKS.find((p) => p.pattern.test(text));
     if (hit && !policyLinks.some((p) => p.kind === hit.kind || p.url.href === u.href)) policyLinks.push({ kind: hit.kind, url: u });
   });
-  const contentLabel = platform ? `${platform.name}上の説明` : "ページ本文";
+  const contentLabel = isArticle ? (platform ? `${platform.name}の記事` : "記事本文") : platform ? `${platform.name}上の説明` : "ページ本文";
   const mainText = findTextSignals(visibleText($, scope), contentLabel);
+
+  // 記事では AI の話題は弱い根拠にし、「AIで作成した」という開示とデータ学習の記述だけをそのまま扱う
+  if (isArticle) {
+    for (const f of mainText.findings) {
+      if (!/:(?:disclosure|training)$/.test(f.id)) f.strength = DEMOTE[f.strength];
+    }
+  }
 
   // GitHub リポジトリなら依存関係を調べる。README は「AIについて書いている」だけの場合があるので、
   // 依存関係が読めたときは README の記述を一段階（AIライブラリがなければ二段階）弱める
@@ -197,6 +213,7 @@ export async function scanUrl(input: string): Promise<ScanResult> {
     url: page.url,
     title,
     platform: platform ? { name: platform.name, isRepository: Boolean(repo) } : null,
+    isArticle,
     pagesChecked,
     ...summarize(findings, negated),
   };

@@ -9,6 +9,8 @@ export type Platform = {
   host: RegExp;
   /** ページの中身を表す要素。最初に見つかったものを使う */
   contentSelector: string[];
+  /** blog: 記事を載せるサービス。記事として判定する */
+  kind?: "blog";
 };
 
 export const PLATFORMS: Platform[] = [
@@ -24,9 +26,24 @@ export const PLATFORMS: Platform[] = [
   { id: "pypi", name: "PyPI", host: /^pypi\.org$/, contentSelector: [".project-description", "main"] },
   { id: "youtube", name: "YouTube", host: /^(?:www\.|m\.)?youtube\.com$/, contentSelector: ["#description", "main"] },
   { id: "x", name: "X", host: /^(?:www\.)?(?:x|twitter)\.com$/, contentSelector: ["main"] },
-  { id: "note", name: "note", host: /^note\.com$/, contentSelector: ["article", "main"] },
-  { id: "qiita", name: "Qiita", host: /^qiita\.com$/, contentSelector: ["article", "main"] },
-  { id: "zenn", name: "Zenn", host: /^zenn\.dev$/, contentSelector: ["article", "main"] },
+  { id: "note", name: "note", kind: "blog", host: /^note\.com$/, contentSelector: ["article", "main"] },
+  { id: "qiita", name: "Qiita", kind: "blog", host: /^qiita\.com$/, contentSelector: ["article", "main"] },
+  { id: "zenn", name: "Zenn", kind: "blog", host: /^zenn\.dev$/, contentSelector: ["article", "main"] },
+
+  // --- ブログサービス ---
+  { id: "hatena", name: "はてなブログ", kind: "blog", host: /(?:^|\.)(?:hatenablog\.(?:com|jp)|hatena\.blog|hateblo\.jp|hatenadiary\.(?:com|jp|org))$/, contentSelector: [".entry-content", "article", "main"] },
+  { id: "ameblo", name: "アメーバブログ", kind: "blog", host: /^(?:s\.)?ameblo\.jp$/, contentSelector: ["#entryBody", '[data-uranus-component="entryBody"]', "article", "main"] },
+  { id: "medium", name: "Medium", kind: "blog", host: /(?:^|\.)medium\.com$/, contentSelector: ["article", "main"] },
+  { id: "wordpress-com", name: "WordPress.com", kind: "blog", host: /\.wordpress\.com$/, contentSelector: [".entry-content", "article", "main"] },
+  { id: "blogger", name: "Blogger", kind: "blog", host: /\.blogspot\.[a-z.]+$/, contentSelector: [".post-body", "article", "main"] },
+  { id: "substack", name: "Substack", kind: "blog", host: /(?:^|\.)substack\.com$/, contentSelector: [".available-content", ".body.markup", "article", "main"] },
+  { id: "livedoor", name: "ライブドアブログ", kind: "blog", host: /(?:^|\.)(?:livedoor\.(?:blog|jp|biz)|blog\.jp|doorblog\.jp)$/, contentSelector: [".article-body", ".article-body-inner", "article", "main"] },
+  { id: "fc2", name: "FC2ブログ", kind: "blog", host: /\.(?:blog\d*\.)?fc2\.com$/, contentSelector: [".entry_body", ".entry-body", ".entry_text", "article", "main"] },
+  { id: "seesaa", name: "Seesaaブログ", kind: "blog", host: /\.seesaa\.net$/, contentSelector: [".text", ".article", "article", "main"] },
+  { id: "goo-blog", name: "gooブログ", kind: "blog", host: /^blog\.goo\.ne\.jp$/, contentSelector: [".entry-body", "article", "main"] },
+  { id: "jugem", name: "JUGEM", kind: "blog", host: /\.jugem\.jp$/, contentSelector: [".entry_body", ".entry", "article", "main"] },
+  { id: "exblog", name: "エキサイトブログ", kind: "blog", host: /\.exblog\.jp$/, contentSelector: [".post-main", ".POST_BODY", "article", "main"] },
+  { id: "tumblr", name: "Tumblr", kind: "blog", host: /(?:^|\.)tumblr\.com$/, contentSelector: ["article", "main"] },
 ];
 
 export function findPlatform(host: string): Platform | undefined {

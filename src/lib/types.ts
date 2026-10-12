@@ -26,5 +26,7 @@ export type ScanResult = AnalysisResult & {
   title: string | null;
   /** GitHub や App Store など、他者のコンテンツを載せているプラットフォーム上のページ */
   platform: { name: string; isRepository: boolean } | null;
+  /** ブログ記事など。AIの話題ではなく、AIで作成したことの開示を重視して判定した */
+  isArticle: boolean;
   pagesChecked: { url: string; kind: string; ok: boolean }[];
 };
